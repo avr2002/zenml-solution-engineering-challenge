@@ -34,60 +34,69 @@
 
 terraform {
   required_providers {
-    # Example for AWS:
-    # aws = {
-    #   source  = "hashicorp/aws"
-    #   version = "~> 5.0"
-    # }
-
-    # Example for GCP:
-    # google = {
-    #   source  = "hashicorp/google"
-    #   version = "~> 6.0"
-    # }
-
-    # Example for Azure:
-    # azurerm = {
-    #   source  = "hashicorp/azurerm"
-    #   version = "~> 4.0"
-    # }
+    aws = {
+      source = "hashicorp/aws"
+      # version = ">=6.28.0"
+    }
 
     zenml = {
       source = "zenml-io/zenml"
+      # version = ">=3.0.4"
     }
   }
 }
 
-# TODO: Configure your cloud provider
-# provider "aws" {
-#   region = var.aws_region
-# }
+provider "aws" {
+  region = "us-west-2"
+}
 
-# TODO: Configure ZenML provider
 # provider "zenml" {
 #   # Configuration will be loaded from environment variables:
 #   # ZENML_SERVER_URL and ZENML_API_KEY
 # }
 
-# TODO: Use the ZenML stack module for your chosen cloud provider.
-# This provisions cloud resources AND registers the resulting stack in your ZenML server.
-# module "zenml_stack" {
-#   source = "zenml-io/zenml-stack/aws"
-#   # or "zenml-io/zenml-stack/gcp"
-#   # or "zenml-io/zenml-stack/azure"
-#
-#   # Recommended: pin a version (see the Terraform registry for latest).
-#   # version = "x.y.z"
-#
-#   zenml_stack_name = "cloud-migration-stack"
-#   # Pick a cloud orchestrator:
-#   # - AWS: "sagemaker" (default)
-#   # - GCP: "vertex" (default)
-#   # - Azure: typically "skypilot" / "azureml" depending on module capabilities
-#   orchestrator = "sagemaker"
-# }
+variable "grafana_otlp_endpoint" {
+  description = "OTLP HTTP endpoint for Grafana Cloud logs"
+  type        = string
+}
 
-# TODO: Add outputs for important values
-# output "zenml_stack_id" {
-#   value = module.zenml_stack.zenml_stack_id
-# }
+variable "grafana_otlp_auth_header" {
+  description = "Authorization header value for Grafana Cloud OTLP endpoint, e.g., `Basic MTQxxx...`"
+  type        = string
+  sensitive   = true
+}
+
+
+# THis will create a ZenML stack on AWS with SageMaker as the orchestrator
+module "zenml_stack" {
+  # source = "zenml-io/zenml-stack/aws"
+  source = "./modules/terraform-aws-zenml-stack"
+
+  zenml_stack_name = "cloud-migration-stack"
+  orchestrator     = "sagemaker" # or "skypilot" or "local"
+
+  # Pass Grafana OTLP settings from root variables (populated via TF_VAR_*)
+  grafana_otlp_endpoint    = var.grafana_otlp_endpoint
+  grafana_otlp_auth_header = var.grafana_otlp_auth_header
+
+  # version = "2.0.10" # latest as of Jan 10 2026
+}
+
+
+# ref: https://registry.terraform.io/modules/zenml-io/zenml-stack/aws/latest?tab=outputs
+# I copied the descriptions of the outputs from ^^^above docs
+
+output "zenml_stack_id" {
+  description = "The ID of the ZenML stack that was registered with the ZenML server"
+  value       = module.zenml_stack.zenml_stack_id
+}
+
+output "zenml_stack_name" {
+  description = "The name of the ZenML stack that was registered with the ZenML server"
+  value       = module.zenml_stack.zenml_stack_name
+}
+
+output "zenml_stack" {
+  description = "The ZenML stack that was registered with the ZenML server"
+  value       = module.zenml_stack.zenml_stack
+}
